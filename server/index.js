@@ -1,6 +1,7 @@
 import express from 'express';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { timingSafeEqual } from 'node:crypto';
 
 import { getState, update, persist, newId } from './store.js';
 import { LEAVE_TYPES, LEAVE_STATUS, computeBalances, monthlyStats, defaultRecoveryDate, holidaySet } from './domain.js';
@@ -14,6 +15,38 @@ app.use(express.json({ limit: '8mb' }));
 
 const PORT = process.env.PORT || 3000;
 const ISO_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+// ---- Health check (public, avant l'auth pour Railway) ----
+app.get('/api/health', (req, res) => res.json({ ok: true }));
+
+// ---- Authentification optionnelle (HTTP Basic) ----
+// Activée uniquement si APP_PASSWORD est défini -> le local reste sans mot de passe.
+const AUTH_USER = process.env.APP_USERNAME || 'admin';
+const AUTH_PASS = process.env.APP_PASSWORD;
+
+function safeEqual(a, b) {
+  const ab = Buffer.from(String(a));
+  const bb = Buffer.from(String(b));
+  if (ab.length !== bb.length) return false;
+  return timingSafeEqual(ab, bb);
+}
+
+if (AUTH_PASS) {
+  app.use((req, res, next) => {
+    const header = req.headers.authorization || '';
+    const [scheme, encoded] = header.split(' ');
+    if (scheme === 'Basic' && encoded) {
+      const decoded = Buffer.from(encoded, 'base64').toString('utf8');
+      const i = decoded.indexOf(':');
+      const user = decoded.slice(0, i);
+      const pass = decoded.slice(i + 1);
+      if (safeEqual(user, AUTH_USER) && safeEqual(pass, AUTH_PASS)) return next();
+    }
+    res.set('WWW-Authenticate', 'Basic realm="Vacation Maxxing", charset="UTF-8"');
+    return res.status(401).send('Authentification requise');
+  });
+  console.log('Authentification activée (HTTP Basic).');
+}
 
 function isValidISO(s) {
   if (typeof s !== 'string' || !ISO_RE.test(s)) return false;
