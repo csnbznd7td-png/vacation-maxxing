@@ -1,0 +1,17 @@
+{
+  "name": "vacation-maxxing",
+  "version": "1.0.0",
+  "description": "Application personnelle de gestion des congés, jours fériés, récupérations et recommandations de plages optimales.",
+  "type": "module",
+  "main": "server/index.js",
+  "scripts": {
+    "start": "node server/index.js",
+    "dev": "node --watch server/index.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "express": "^4.19.2"
+  }
+}
